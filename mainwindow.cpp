@@ -18,6 +18,7 @@ MainWindow::MainWindow(QWidget *parent)
     m_operator = "";
     m_waitingForSecond = false;
     m_hasResult = false;
+    m_error = false;
 
     // 数字按钮 0-9 连接到 onDigitClicked
     for (int i = 0; i <= 9; i++) {
@@ -110,6 +111,9 @@ void MainWindow::keyPressEvent(QKeyEvent *event)
 // 追加数字（鼠标和键盘共用）
 void MainWindow::appendDigit(int digit)
 {
+    if (m_error)           // 错误态：先复位，再按新计算处理
+        resetAll();
+
     QString text = ui->display->text();
 
     // 如果刚计算完结果，重新开始输入
@@ -151,6 +155,9 @@ void MainWindow::onDigitClicked()
 // 设置运算符
 void MainWindow::setOperator(const QString &op)
 {
+    if (m_error)          // 错误态下按运算符：先清空，从 0 重新开始
+        resetAll();
+
     double current = ui->display->text().toDouble();
 
     if (!m_operator.isEmpty() && m_waitingForSecond) {
@@ -162,7 +169,8 @@ void MainWindow::setOperator(const QString &op)
     if (!m_operator.isEmpty()) {
         // 第二操作数已输入完，先算出中间结果，实现连续运算
         m_secondOperand = current;
-        calculate();
+        if (!calculate())
+            return;
     } else {
         // 第一次按运算符：记住左操作数
         m_firstOperand = current;
@@ -182,8 +190,8 @@ void MainWindow::onOperatorClicked()
     setOperator(op);
 }
 
-// 执行运算
-void MainWindow::calculate()
+// 执行运算。返回 false 表示运算失败（已进入错误态）
+bool MainWindow::calculate()
 {
     double result = 0;
 
@@ -195,12 +203,12 @@ void MainWindow::calculate()
         result = m_firstOperand * m_secondOperand;
     } else if (m_operator == "÷") {
         if (m_secondOperand == 0) {
-            ui->display->setText("错误：除数不能为0");
-            m_operator = "";
-            m_hasResult = true;
-            return;
+            showError("除数不能为 0");
+            return false;
         }
         result = m_firstOperand / m_secondOperand;
+    } else {
+        return false;
     }
 
     // 格式化结果，去掉多余的零
@@ -215,11 +223,41 @@ void MainWindow::calculate()
     m_firstOperand = result;
     m_operator = "";
     m_hasResult = true;
+    m_error = false;
+    return true;
+}
+
+// 进入错误态：清空运算符与操作数，让下一次输入从零开始
+void MainWindow::showError(const QString &msg)
+{
+    ui->display->setText(msg);
+    m_error = true;
+    m_firstOperand = 0;
+    m_secondOperand = 0;
+    m_operator = "";
+    m_waitingForSecond = false;
+    m_hasResult = true;   // 下一次按数字/小数点会自动重新开始
+}
+
+// 复位全部状态
+void MainWindow::resetAll()
+{
+    ui->display->setText("0");
+    m_firstOperand = 0;
+    m_secondOperand = 0;
+    m_operator = "";
+    m_waitingForSecond = false;
+    m_hasResult = false;
+    m_error = false;
 }
 
 // 等号
 void MainWindow::onEqualClicked()
 {
+    if (m_error) {         // 错误态下按 =：清空重来
+        resetAll();
+        return;
+    }
     if (m_operator.isEmpty()) return;
 
     QString text = ui->display->text();
@@ -231,28 +269,28 @@ void MainWindow::onEqualClicked()
 // 清除 C（全部清除）
 void MainWindow::onClearClicked()
 {
-    ui->display->setText("0");
-    m_firstOperand = 0;
-    m_secondOperand = 0;
-    m_operator = "";
-    m_waitingForSecond = false;
-    m_hasResult = false;
+    resetAll();
 }
 
 // 清除当前输入 CE
 void MainWindow::onClearEntryClicked()
 {
+    if (m_error) {          // 错误态下 CE 等同重新开始
+        resetAll();
+        return;
+    }
     ui->display->setText("0");
+    m_hasResult = false;
 }
 
 // 退格
 void MainWindow::onBackspaceClicked()
 {
-    QString text = ui->display->text();
-    if (text == "错误：除数不能为0") {
-        onClearClicked();
+    if (m_error) {          // 错误提示不允许逐字退格
+        resetAll();
         return;
     }
+    QString text = ui->display->text();
     if (text.length() > 1) {
         text.chop(1);
         if (text == "-") text = "0";
@@ -265,6 +303,10 @@ void MainWindow::onBackspaceClicked()
 // 正负号
 void MainWindow::onNegateClicked()
 {
+    if (m_error) {
+        resetAll();
+        return;
+    }
     QString text = ui->display->text();
     if (text == "0") return;
     if (text.startsWith("-")) {
@@ -278,6 +320,9 @@ void MainWindow::onNegateClicked()
 // 小数点
 void MainWindow::onDecimalClicked()
 {
+    if (m_error)           // 错误态：不允许把小数点拼到错误提示后面
+        resetAll();
+
     QString text = ui->display->text();
 
     // 如果刚计算完结果，重新开始
@@ -305,6 +350,10 @@ void MainWindow::onDecimalClicked()
 // 百分号
 void MainWindow::onPercentClicked()
 {
+    if (m_error) {
+        resetAll();
+        return;
+    }
     QString text = ui->display->text();
     double value = text.toDouble();
     value /= 100.0;

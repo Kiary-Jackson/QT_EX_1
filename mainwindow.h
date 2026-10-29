@@ -30,10 +30,12 @@ private slots:
     void onPercentClicked();  // 百分号 %
 
 private:
-    void calculate();         // 执行运算
+    bool calculate();         // 执行运算，返回 false 表示失败（除零等）
     void appendDigit(int digit); // 追加数字
     void setOperator(const QString &op); // 设置运算符
     void updateDisplay();     // 更新显示
+    void resetAll();          // 复位全部状态（C 与错误恢复共用）
+    void showError(const QString &msg); // 进入错误态
 
     Ui::MainWindow *ui;
 
@@ -43,6 +45,7 @@ private:
     QString m_operator;       // 当前运算符
     bool m_waitingForSecond;  // 是否等待第二个操作数
     bool m_hasResult;         // 是否刚计算完结果
+    bool m_error;             // 是否处于错误态（如除数为 0）
 };
 
 #endif // MAINWINDOW_H
