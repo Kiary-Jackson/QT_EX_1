@@ -36,6 +36,7 @@ private:
     void updateDisplay();     // 更新显示
     void resetAll();          // 复位全部状态（C 与错误恢复共用）
     void showError(const QString &msg); // 进入错误态
+    static QString formatNumber(double value); // 数值 → 显示字符串
 
     Ui::MainWindow *ui;
 

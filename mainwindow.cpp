@@ -4,6 +4,7 @@
 #include <QKeyEvent>
 #include <QPushButton>
 #include <QMessageBox>
+#include <QtMath>
 
 MainWindow::MainWindow(QWidget *parent)
     : QMainWindow(parent)
@@ -158,7 +159,7 @@ void MainWindow::setOperator(const QString &op)
     if (m_error)          // 错误态下按运算符：先清空，从 0 重新开始
         resetAll();
 
-    double current = ui->display->text().toDouble();
+    double current = m_hasResult ? m_firstOperand : ui->display->text().toDouble();
 
     if (!m_operator.isEmpty() && m_waitingForSecond) {
         // 连续按下运算符（如 5 + ×）：只替换运算符，不触发计算
@@ -212,14 +213,7 @@ bool MainWindow::calculate()
     }
 
     // 格式化结果，去掉多余的零
-    QString resultStr;
-    if (result == static_cast<int>(result)) {
-        resultStr = QString::number(static_cast<int>(result));
-    } else {
-        resultStr = QString::number(result, 'g', 10);
-    }
-
-    ui->display->setText(resultStr);
+    ui->display->setText(formatNumber(result));
     m_firstOperand = result;
     m_operator = "";
     m_hasResult = true;
@@ -354,17 +348,22 @@ void MainWindow::onPercentClicked()
         resetAll();
         return;
     }
-    QString text = ui->display->text();
-    double value = text.toDouble();
-    value /= 100.0;
+    const double value = ui->display->text().toDouble() / 100.0;
+    ui->display->setText(formatNumber(value));
+    m_hasResult = false;      // 百分号之后的值仍属于当前操作数
+}
 
-    QString resultStr;
-    if (value == static_cast<int>(value)) {
-        resultStr = QString::number(static_cast<int>(value));
-    } else {
-        resultStr = QString::number(value, 'g', 10);
-    }
-    ui->display->setText(resultStr);
+// 数值 → 显示字符串：整数去掉多余的 ".0"，非整数保留 12 位有效数字
+QString MainWindow::formatNumber(double value)
+{
+    if (!qIsFinite(value))
+        return QStringLiteral("错误");
+
+    // 用 qRound64 判断整数，避免 static_cast<int> 在超过 2^31 时溢出
+    if (qAbs(value) < 1e15 && value == static_cast<double>(qRound64(value)))
+        return QString::number(qRound64(value));
+
+    return QString::number(value, 'g', 12);
 }
 
 // 更新显示
