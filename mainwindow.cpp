@@ -81,6 +81,7 @@ void MainWindow::keyPressEvent(QKeyEvent *event)
     case Qt::Key_division:
         setOperator("÷");
         return;
+    case Qt::Key_Equal:
     case Qt::Key_Return:
     case Qt::Key_Enter:
         onEqualClicked();
@@ -150,23 +151,24 @@ void MainWindow::onDigitClicked()
 // 设置运算符
 void MainWindow::setOperator(const QString &op)
 {
-    QString text = ui->display->text();
-    double current = text.toDouble();
+    double current = ui->display->text().toDouble();
 
-    // 如果已有运算符且正在等待第二个操作数，先计算中间结果（连续运算）
     if (!m_operator.isEmpty() && m_waitingForSecond) {
-        m_firstOperand = current;
-        calculate();
+        // 连续按下运算符（如 5 + ×）：只替换运算符，不触发计算
         m_operator = op;
-    } else if (!m_operator.isEmpty()) {
-        // 第一次设置运算符
-        m_firstOperand = current;
-        m_operator = op;
-    } else {
-        m_firstOperand = current;
-        m_operator = op;
+        return;
     }
 
+    if (!m_operator.isEmpty()) {
+        // 第二操作数已输入完，先算出中间结果，实现连续运算
+        m_secondOperand = current;
+        calculate();
+    } else {
+        // 第一次按运算符：记住左操作数
+        m_firstOperand = current;
+    }
+
+    m_operator = op;
     m_waitingForSecond = true;
     m_hasResult = false;
 }
